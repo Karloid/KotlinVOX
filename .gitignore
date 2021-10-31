@@ -30,6 +30,8 @@ cmake-build-release/
 # File-based project format
 *.iws
 
+*.vox
+
 # IntelliJ
 out/
 
@@ -61,3 +63,4 @@ fabric.properties
 
 stats_wcf
 /src/main/kotlin/notrack
+/demo.mov
