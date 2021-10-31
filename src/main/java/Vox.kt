@@ -3,6 +3,7 @@ import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
+import kotlin.math.floor
 import kotlin.math.roundToInt
 
 class Vox(
@@ -19,15 +20,15 @@ class Vox(
     val maxVolume = DAABBCC();
     val colors = mutableListOf<Int>();
     var maxCubeId = 0;
-    var minCubeX = 1e7;
-    var minCubeY = 1e7;
-    var minCubeZ = 1e7;
+    var minCubeX: Int = 1e7.toInt();
+    var minCubeY: Int = 1e7.toInt();
+    var minCubeZ: Int = 1e7.toInt();
     var cubesId = mutableMapOf<Int, MutableMap<Int, MutableMap<Int, Int>>>()
     var voxelId = mutableMapOf<Int, MutableMap<Int, MutableMap<Int, Int>>>()
 
     init {
         maxVolume.lowerBound = Dvec3(1e7f)
-        maxVolume.upperBound = Dvec3(1e7f)
+        maxVolume.upperBound = Dvec3(0.0f)
     }
 
     fun saveToFile(filename: String) {
@@ -43,10 +44,11 @@ class Vox(
         // main
         channel.write(getBB('M', 'A', 'I', 'N'))
 
-        val numBytesMainChunkPos = channel.position()
         channel.write(getBB(0))
+        val numBytesMainChunkPos = channel.position()
 
         val headerSize: Long = channel.position()
+        channel.write(getBB(0))
 
         val cubesCount = cubes.size
 
@@ -101,9 +103,99 @@ class Vox(
 
         val mainChildChunkSize = channel.position() - headerSize
         channel.position(numBytesMainChunkPos)
-        channel.write(getBB(mainChildChunkSize.toInt()))
+        val mainChildChunkBb = getBB(mainChildChunkSize.toInt())
+        channel.write(mainChildChunkBb).also {
+            println("mainChildChunkSize written=$it " +
+                    "mainChildChunkBb=${mainChildChunkBb.array().joinToString { Integer.toHexString(it.toInt()) }} channelPos=${channel.position()}"
+            )
+        }
 
         channel.close()
+    }
+
+    fun addVoxel(vX: Int, vY: Int, vZ: Int, vColorIndex: Int) {
+        // cube pos
+        val ox = floor(vX / m_MaxVoxelPerCubeX.toDouble()).roundToInt()
+        val oy = floor(vY / m_MaxVoxelPerCubeY.toDouble()).roundToInt()
+        val oz = floor(vZ / m_MaxVoxelPerCubeZ.toDouble()).roundToInt()
+
+        minCubeX = minOf(minCubeX, ox);
+        minCubeY = minOf(minCubeX, oy);
+        minCubeZ = minOf(minCubeX, oz);
+
+        val cube = getCube(ox, oy, oz);
+
+        mergeVoxelInCube(vX, vY, vZ, vColorIndex, cube);
+    }
+
+    private fun mergeVoxelInCube(vX: Int, vY: Int, vZ: Int, vColorIndex: Int, vCube: VoxCube) {
+        maxVolume.combine(Dvec3(vX.toDouble(), vY.toDouble(), vZ.toDouble()));
+
+        var exist = false;
+
+        voxelId[vX]?.get(vY)?.get(vZ)
+            ?.let {
+                exist = true
+            }
+
+        if (exist == false) {
+            vCube.xyzi.voxels.add((vX % m_MaxVoxelPerCubeX).toByte()); // x
+            vCube.xyzi.voxels.add((vY % m_MaxVoxelPerCubeY).toByte()); // y
+            vCube.xyzi.voxels.add((vZ % m_MaxVoxelPerCubeZ).toByte()); // y
+
+            // correspond a la loc de la couleur du voxel en question
+            if (voxelId[vX] == null) {
+                voxelId[vX] = mutableMapOf()
+            }
+
+            if (voxelId[vX]!![vY] == null) {
+                voxelId[vX]!![vY] = mutableMapOf()
+            }
+            voxelId[vX]!![vY]!![vZ] = vCube.xyzi.voxels.size;
+
+            vCube.xyzi.voxels.add(vColorIndex.toByte()); // color index
+        } else {
+
+        }
+    }
+
+    private fun getCube(vX: Int, vY: Int, vZ: Int): VoxCube {
+        val id = getCubeId(vX, vY, vZ);
+
+        if (id == cubes.size) {
+            val c = VoxCube();
+
+            c.id = id;
+
+            c.tx = vX;
+            c.ty = vY;
+            c.tz = vZ;
+
+            c.size.sizex = m_MaxVoxelPerCubeX + 1;
+            c.size.sizey = m_MaxVoxelPerCubeY + 1;
+            c.size.sizez = m_MaxVoxelPerCubeZ + 1;
+
+            cubes.add(c);
+        }
+
+        return cubes.get(id)
+    }
+
+    private fun getCubeId(vX: Int, vY: Int, vZ: Int): Int {
+        cubesId[vX]?.get(vY)?.get(vZ)?.let { return it }
+
+        if (cubesId[vX] == null) {
+            cubesId[vX] = mutableMapOf()
+        }
+
+        if (cubesId[vX]!![vY] == null) {
+            cubesId[vX]!![vY] = mutableMapOf()
+        }
+
+        val newValue = maxCubeId++
+        cubesId[vX]!![vY]!![vZ] = newValue
+
+        return newValue;
     }
 
     class VoxCube {
@@ -128,6 +220,15 @@ class Vox(
 class DAABBCC {
     fun getSize(): Dvec3 {
         return Dvec3(upperBound - lowerBound)
+    }
+
+    fun combine(pt: Dvec3) {
+        lowerBound.x = minOf(lowerBound.x, pt.x);
+        lowerBound.y = minOf(lowerBound.y, pt.y);
+        lowerBound.z = minOf(lowerBound.z, pt.z);
+        upperBound.x = maxOf(upperBound.x, pt.x);
+        upperBound.y = maxOf(upperBound.y, pt.y);
+        upperBound.z = maxOf(upperBound.z, pt.z);
     }
 
     var upperBound: Dvec3 = Dvec3(0.0)
@@ -264,8 +365,10 @@ class XYZI {
 
         channel.write(getBB(numVoxels))
         val voxelss = ByteBuffer.wrap(voxels.toByteArray())
-        voxelss.flip() // TODO CHECK
+        println("voxels=$voxels")
+        //voxelss.flip() // TODO CHECK
         val written = channel.write(voxelss)
+        println(">>>>>>> ${voxelss.hexString()}")
         println("written voxels=$written")
 
     }
@@ -285,7 +388,10 @@ class SIZE {
 
     fun write(channel: FileChannel) {
         // chunk header
-        channel.write(getBB('S', 'I', 'Z', 'E'))
+        val tmpBB = getBB('S', 'I', 'Z', 'E')
+        channel.write(tmpBB).also {
+            println("SIZE written=$it bb=${tmpBB.hexString()}")
+        }
         channel.write(getBB(getSize()))
         channel.write(getBB(0))
 
@@ -299,6 +405,10 @@ class SIZE {
     private fun getSize(): Int {
         return 4 * 3
     }
+}
+
+private fun ByteBuffer.hexString(): String {
+    return array().joinToString(separator = "") { Integer.toHexString(it.toInt()).padStart(2, '0') }
 }
 
 class NSHP(vCount: Int) {
@@ -360,7 +470,23 @@ class NGRP(cubesCount: Int) {
     var nodeId: Int = 0
 
     fun write(channel: FileChannel) {
-        //TODO
+        channel.write(getBB('n', 'G', 'R', 'P'))
+        val contentSize = getSize()
+        channel.write(getBB(contentSize))
+        val childSize = 0
+        channel.write(getBB(childSize))
+
+        // data
+        channel.write(getBB(nodeId))
+        nodeAttribs.write(channel)
+        channel.write(getBB(nodeChildrenNodes))
+        for (childNode in childNodes) {
+            channel.write(getBB(childNode))
+        }
+    }
+
+    private fun getSize(): Int {
+        return 4 * (2 + nodeChildrenNodes) + nodeAttribs.getSize()
     }
 }
 
@@ -369,6 +495,7 @@ private val bb = ByteBuffer.allocate(4).also {
 }
 
 private fun getBB(i: Int): ByteBuffer {
+    println(">>>>>>> ${bb.hexString()}")
     bb.position(0)
     bb.putInt(i)
     bb.flip()
@@ -396,7 +523,7 @@ class NTRN(countFrames: Int) {
     var nodeAttribs = DICT()
     var childNodeId = 0;
     var reservedId = -1;
-    var layerId = 1;
+    var layerId = -1;
     var numFrames = countFrames
     var frames = List(numFrames) { DICT() };
 
@@ -464,7 +591,9 @@ class DICT {
 
     fun write(channel: FileChannel) {
         count = keys.size
-        channel.write(getBB(count))
+        val tmpBB = getBB(count)
+        channel.write(tmpBB)
+        println("DICT write=${tmpBB.hexString()}")
         repeat(count) {
             keys[it].write(channel)
         }
@@ -496,7 +625,7 @@ private fun String.write(channel: FileChannel) {
 
     localBB.order(ByteOrder.LITTLE_ENDIAN)
     repeat(length) {
-        localBB.putChar(get(it))
+        localBB.put(get(it).toByte())
     }
     localBB.flip()
 

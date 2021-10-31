@@ -1,12 +1,8 @@
 class TestWriter {
     fun writeCoupleVoxels() {
+        val vox = Vox(126, 126, 126)
 
-
-        val vox = Vox(100, 100, 100)
-
-
-        
-        
+        vox.addVoxel(1, 1, 1, 1)
 
         vox.saveToFile("test.vox")
 
