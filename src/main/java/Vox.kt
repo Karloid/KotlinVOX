@@ -365,10 +365,10 @@ class XYZI {
 
         channel.write(getBB(numVoxels))
         val voxelss = ByteBuffer.wrap(voxels.toByteArray())
-        println("voxels=$voxels")
+        //println("voxels=$voxels")
         //voxelss.flip() // TODO CHECK
         val written = channel.write(voxelss)
-        println(">>>>>>> ${voxelss.hexString()}")
+        //println(">>>>>>> ${voxelss.hexString()}")
         println("written voxels=$written")
 
     }
@@ -495,7 +495,7 @@ private val bb = ByteBuffer.allocate(4).also {
 }
 
 private fun getBB(i: Int): ByteBuffer {
-    println(">>>>>>> ${bb.hexString()}")
+   // println(">>>>>>> ${bb.hexString()}")
     bb.position(0)
     bb.putInt(i)
     bb.flip()

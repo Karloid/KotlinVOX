@@ -1,19 +1,30 @@
-import java.lang.Math.abs
-
 class TestWriter {
     fun writeCoupleVoxels() {
         val vox = Vox(126, 126, 126)
 
 
-        val size = 1_000
-        val center = Point2D(size / 2, size / 2)
+        val size = 3_000
+        val mountains = List(size / 10) {
+            Point2D((Math.random() * size).toInt(), (Math.random() * size).toInt())
+        }
 
         val cur = Point2D(0, 0)
         repeat(size) { x ->
             repeat(size) { y ->
-                cur[x] = y
-                val z = -cur.euclidianDistance(center).toInt() + size * 2
-                vox.addVoxel(x, y, z, z % 255)
+                @Suppress("ReplaceGetOrSet")
+                cur.set(x, y)
+                val z = (mountains.map {
+                    var dist = it.euclidianDistance(cur)
+                    if (dist.isNaN()) {
+                        dist = 10.0
+                    }
+                    val res = dist + 5
+                    res
+                }
+                    .minOrNull()!!).toInt()
+                val vColorIndex = z % 20 + 1
+               // println("z=$z vColorIndex=$vColorIndex")
+                vox.addVoxel(x, y, z, vColorIndex)
             }
         }
 
