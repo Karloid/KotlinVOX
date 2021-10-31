@@ -78,7 +78,7 @@ class Vox(
 
             c.tx = kotlin.math.floor((c.tx - minCubeX + 0.5f) * m_MaxVoxelPerCubeX - maxVolume.lowerBound.x - maxVolume.getSize().x * 0.5).roundToInt();
             c.ty = kotlin.math.floor((c.ty - minCubeY + 0.5f) * m_MaxVoxelPerCubeY - maxVolume.lowerBound.y - maxVolume.getSize().y * 0.5).roundToInt();
-            c.tz = kotlin.math.floor((c.tz - minCubeZ + 0.5f) * m_MaxVoxelPerCubeZ).roundToInt();
+            c.tz = kotlin.math.floor((c.tz - minCubeZ + 0.5f) * m_MaxVoxelPerCubeZ  - maxVolume.lowerBound.z - maxVolume.getSize().z * 0.5).roundToInt();
 
             trans.frames[0].add("_t", c.tx.toString() + " " + c.ty.toString() + " " + c.tz)
 

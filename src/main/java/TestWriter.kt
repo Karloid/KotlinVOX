@@ -5,18 +5,15 @@ class TestWriter {
         val vox = Vox(126, 126, 126)
 
 
+        val size = 1_000
+        val center = Point2D(size / 2, size / 2)
 
-        repeat(100) { x ->
-            repeat(200) { y ->
-                vox.addVoxel(x, y, 1, 1)
-               /* var z = abs(Math.sin((x + y) / 100.0) * 50)
-
-                z += Math.random() * 5
-
-                vox.addVoxel(x, y, z.toInt(), z.toInt())
-                repeat(z.toInt()) { vZ ->
-                 //   vox.addVoxel(x, y, vZ, z.toInt())
-                }*/
+        val cur = Point2D(0, 0)
+        repeat(size) { x ->
+            repeat(size) { y ->
+                cur[x] = y
+                val z = -cur.euclidianDistance(center).toInt() + size * 2
+                vox.addVoxel(x, y, z, z % 255)
             }
         }
 
