@@ -8,7 +8,7 @@ class TestWriter {
         
         
 
-        vox.writeToFile("test.vox")
+        vox.saveToFile("test.vox")
 
     }
 
