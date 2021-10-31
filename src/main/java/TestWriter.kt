@@ -2,7 +2,7 @@ class TestWriter {
     fun writeCoupleVoxels() {
 
 
-        val vox = Vox()
+        val vox = Vox(100, 100, 100)
 
 
         

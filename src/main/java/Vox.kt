@@ -311,15 +311,43 @@ class NSHP(vCount: Int) {
     fun write(channel: FileChannel) {
         // chunk header
 
-        val id
+        channel.write(getBB('n', 'S', 'H', 'P'))
+        channel.write(getBB(getSize()))
+        channel.write(getBB(0))
+
+        // data
+
+        channel.write(getBB(nodeId))
+        nodeAttribs.write(channel)
+        channel.write(getBB(numModels))
+        repeat(numModels) { i ->
+            models[i].write(channel)
+        }
+
+    }
+
+    private fun getSize(): Int {
+        var s = 4 * 2 + nodeAttribs.getSize()
+        repeat(numModels) {
+            s += models[it].getSize()
+        }
+        return s
     }
 }
 
 class MODEL {
     var modelId = 0
+
     var modelAttribs = DICT()
 
-    //TODO
+    fun getSize(): Int {
+        return 4 + modelAttribs.getSize()
+    }
+
+    fun write(channel: FileChannel) {
+        channel.write(getBB(modelId))
+        modelAttribs.write(channel)
+    }
 }
 
 class NGRP(cubesCount: Int) {
