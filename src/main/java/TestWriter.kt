@@ -1,5 +1,9 @@
 class TestWriter {
     fun writeCoupleVoxels() {
+        createCraters()
+    }
+
+    private fun createCraters() {
         val vox = Vox(126, 126, 126)
 
 
@@ -23,13 +27,12 @@ class TestWriter {
                 }
                     .minOrNull()!!).toInt()
                 val vColorIndex = z % 20 + 1
-               // println("z=$z vColorIndex=$vColorIndex")
+                // println("z=$z vColorIndex=$vColorIndex")
                 vox.addVoxel(x, y, z, vColorIndex)
             }
         }
 
-        vox.saveToFile("test.vox")
-
+        vox.saveToFile("craters.vox")
     }
 
 }
