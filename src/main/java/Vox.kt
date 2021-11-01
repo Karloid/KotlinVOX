@@ -76,9 +76,9 @@ class Vox(
             trans.childNodeId = ++nodeIds
             trans.layerId = 0
 
-            c.tx = kotlin.math.floor((c.tx - minCubeX + 0.5f) * m_MaxVoxelPerCubeX - maxVolume.lowerBound.x - maxVolume.getSize().x * 0.5).roundToInt();
-            c.ty = kotlin.math.floor((c.ty - minCubeY + 0.5f) * m_MaxVoxelPerCubeY - maxVolume.lowerBound.y - maxVolume.getSize().y * 0.5).roundToInt();
-            c.tz = kotlin.math.floor((c.tz - minCubeZ + 0.5f) * m_MaxVoxelPerCubeZ  - maxVolume.lowerBound.z - maxVolume.getSize().z * 0.5).roundToInt();
+            c.tx = floor((c.tx - minCubeX + 0.5f) * m_MaxVoxelPerCubeX - maxVolume.lowerBound.x - maxVolume.getSize().x * 0.5).roundToInt();
+            c.ty = floor((c.ty - minCubeY + 0.5f) * m_MaxVoxelPerCubeY - maxVolume.lowerBound.y - maxVolume.getSize().y * 0.5).roundToInt();
+            c.tz = floor((c.tz - minCubeZ + 0.5f) * m_MaxVoxelPerCubeZ - maxVolume.lowerBound.z - maxVolume.getSize().z * 0.5).roundToInt();
 
             trans.frames[0].add("_t", c.tx.toString() + " " + c.ty.toString() + " " + c.tz)
 
@@ -99,14 +99,25 @@ class Vox(
         }
 
         // rgba
-        // TODO
+        if (colors.size > 0) {
+            val palette = RGBA()
+            repeat(255) { i ->
+                if (i < colors.size) {
+                    palette.colors[i] = colors[i]
+                } else {
+                    palette.colors[i] = 0
+                }
+            }
+            palette.write(channel)
+        }
 
         val mainChildChunkSize = channel.position() - headerSize
         channel.position(numBytesMainChunkPos)
         val mainChildChunkBb = getBB(mainChildChunkSize.toInt())
         channel.write(mainChildChunkBb).also {
-            println("mainChildChunkSize written=$it " +
-                    "mainChildChunkBb=${mainChildChunkBb.array().joinToString { Integer.toHexString(it.toInt()) }} channelPos=${channel.position()}"
+            println(
+                "mainChildChunkSize written=$it " +
+                        "mainChildChunkBb=${mainChildChunkBb.array().joinToString { Integer.toHexString(it.toInt()) }} channelPos=${channel.position()}"
             )
         }
 
@@ -154,8 +165,6 @@ class Vox(
             voxelId[vX]!![vY]!![vZ] = vCube.xyzi.voxels.size;
 
             vCube.xyzi.voxels.add(vColorIndex.toByte()); // color index
-        } else {
-
         }
     }
 
@@ -198,6 +207,13 @@ class Vox(
         return newValue;
     }
 
+    fun addColor(r: Int, g: Int, b: Int, a: Int, index: Int) {
+        while(colors.size <= index) {
+            colors.add(0)
+        }
+        colors[index] = getId(r, g, b, a)
+    }
+
     class VoxCube {
 
         var id = 0
@@ -217,7 +233,31 @@ class Vox(
     }
 }
 
+class RGBA {
+    val colors = IntArray(256, {0})
+
+    fun write(channel: FileChannel) {
+        channel.write(getBB('R', 'G', 'B', 'A'))
+        val contentSize = getSize()
+        channel.write(getBB(contentSize))
+        val childSize = 0
+        channel.write(getBB(childSize))
+
+        // data
+        for (color in colors) {
+            channel.write(getBB(color))
+        }
+    }
+
+    private fun getSize(): Int {
+        return 1 * 4 * 256
+    }
+}
+
 class DAABBCC {
+    var upperBound: Dvec3 = Dvec3(0.0)
+    var lowerBound: Dvec3 = Dvec3(0.0)
+
     fun getSize(): Dvec3 {
         return Dvec3(upperBound - lowerBound)
     }
@@ -230,100 +270,10 @@ class DAABBCC {
         upperBound.y = maxOf(upperBound.y, pt.y);
         upperBound.z = maxOf(upperBound.z, pt.z);
     }
-
-    var upperBound: Dvec3 = Dvec3(0.0)
-    var lowerBound: Dvec3 = Dvec3(0.0)
-
-    //TODO
-    /*
-    * dvec3 lowerBound;	///< the lower left vertex
-		dvec3 upperBound;	///< the upper right vertex
-
-		dAABBCC() : lowerBound(0.0), upperBound(0.0) {}
-		dAABBCC(dvec3 vlowerBound, dvec3 vUpperBound)
-		{
-			lowerBound.x = mini(vlowerBound.x, vUpperBound.x);
-			lowerBound.y = mini(vlowerBound.y, vUpperBound.y);
-			lowerBound.z = mini(vlowerBound.z, vUpperBound.z);
-			upperBound.x = maxi(vlowerBound.x, vUpperBound.x);
-			upperBound.y = maxi(vlowerBound.y, vUpperBound.y);
-			upperBound.z = maxi(vlowerBound.z, vUpperBound.z);
-		}
-		/// Add a vector to this vector.
-		void operator += (const dvec3& v){lowerBound += v; upperBound += v;}
-
-		/// Subtract a vector from this vector.
-		void operator -= (const dvec3& v){lowerBound -= v; upperBound -= v;}
-
-		/// Multiply this vector by a scalar.
-		void operator *= (double a){lowerBound *= a; upperBound *= a;}
-
-		/// Divide this vector by a scalar.
-		void operator /= (double a){lowerBound /= a; upperBound /= a;}
-
-		/// Get the center of the AABB.
-		dvec3 GetCenter() const { return (lowerBound + upperBound) * 0.5; }
-
-		/// Get the extents of the AABB (half-widths).
-		dvec3 GetExtents() const {return (upperBound - lowerBound) * 0.5;}
-
-		/// Get the perimeter length
-		double GetPerimeter() const
-		{
-			double wx = upperBound.x - lowerBound.x;
-			double wy = upperBound.y - lowerBound.y;
-			double wz = upperBound.z - lowerBound.z;
-			return 2.0 * (wx + wy + wz);
-		}
-
-		/// Combine a point into this one.
-		void Combine(dvec3 pt)
-		{
-			lowerBound.x = mini<double>(lowerBound.x, pt.x);
-			lowerBound.y = mini<double>(lowerBound.y, pt.y);
-			lowerBound.z = mini<double>(lowerBound.z, pt.z);
-			upperBound.x = maxi<double>(upperBound.x, pt.x);
-			upperBound.y = maxi<double>(upperBound.y, pt.y);
-			upperBound.z = maxi<double>(upperBound.z, pt.z);
-		}
-
-		/// Does this aabb contain the provided vec2.
-		bool ContainsPoint(const dvec3& pt) const
-		{
-			bool result = true;
-			result = result && lowerBound.x <= pt.x;
-			result = result && lowerBound.y <= pt.y;
-			result = result && lowerBound.z <= pt.z;
-			result = result && pt.x <= upperBound.x;
-			result = result && pt.y <= upperBound.y;
-			result = result && pt.z <= upperBound.z;
-			return result;
-		}
-
-		bool Intersects(const dAABBCC& other)
-		{
-			bool result = true;
-			result = result || lowerBound.x <= other.lowerBound.x;
-			result = result || lowerBound.y <= other.lowerBound.y;
-			result = result || lowerBound.z <= other.lowerBound.z;
-			result = result || other.upperBound.x <= upperBound.x;
-			result = result || other.upperBound.y <= upperBound.y;
-			result = result || other.upperBound.z <= upperBound.z;
-			return result;
-		}
-
-		const dvec3 Size()
-		{
-			return dvec3(upperBound - lowerBound);
-		}
-		* */
-
 }
 
 class Dvec3() {
-    operator fun minus(other: Dvec3): Dvec3 {
-        return Dvec3(x - other.x, y - other.y, z - other.z)
-    }
+
 
     var x = 0.0
     var y = 0.0
@@ -345,6 +295,11 @@ class Dvec3() {
         x = other.x
         y = other.y
         z = other.z
+    }
+
+
+    operator fun minus(other: Dvec3): Dvec3 {
+        return Dvec3(x - other.x, y - other.y, z - other.z)
     }
 
     constructor(fl: Float) : this(fl.toDouble())
@@ -495,7 +450,7 @@ private val bb = ByteBuffer.allocate(4).also {
 }
 
 private fun getBB(i: Int): ByteBuffer {
-   // println(">>>>>>> ${bb.hexString()}")
+    // println(">>>>>>> ${bb.hexString()}")
     bb.position(0)
     bb.putInt(i)
     bb.flip()
